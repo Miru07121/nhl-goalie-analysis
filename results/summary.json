@@ -1,0 +1,14 @@
+{
+  "season": "2024-25 regular season",
+  "situation": "all",
+  "source_rows": 515,
+  "goalies_before_time_filter": 103,
+  "minimum_minutes": 1000,
+  "eligible_goalies": 62,
+  "total_leader": "Connor Hellebuyck",
+  "total_leader_gsax": 39.59,
+  "rate_leader": "Anthony Stolarz",
+  "rate_leader_gsax_per60": 0.778499169560622,
+  "pearson_save_pct_vs_gsax_per60": 0.8552970003434887,
+  "source_sha256": "a718782ffbeb8d0d05eb6921f4cbea300dbcaa86be8e068930e71be4a22a9d8d"
+}
