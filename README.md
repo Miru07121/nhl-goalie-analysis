@@ -69,3 +69,19 @@ Follow-up: use game-level data and a held-out season to investigate whether thes
 **Source: MoneyPuck.com**, [download page](https://moneypuck.com/data.htm), [original CSV](https://moneypuck.com/moneypuck/playerData/seasonSummary/2024/regular/goalies.csv). Retrieved October 18, 2026 (UTC). Snapshot hash is recorded in `results/summary.json`.
 
 MoneyPuck permits non-commercial use with clear attribution; other uses require permission. Its data is not relicensed by this repository. This educational portfolio project is independent of MoneyPuck and the NHL.
+
+## Automated checks and reusable calculations
+
+Run `python -m unittest discover -s tests -v`. GitHub Actions runs these offline
+checks on pushes and pull requests. Tests cover rate denominators, the exact
+1,000-minute boundary, zero exposure, situation filtering, duplicate IDs,
+nonfinite inputs, empty sensitivity cohorts, and published season leaders.
+
+`calculate_metrics(raw)` returns validated positive-time, positive-shot records
+before the workload cutoff. `threshold_sensitivity(metrics)` applies the
+500/1,000/1,500/2,000-minute cutoffs. An empty cohort has count zero and blank
+leader fields in CSV output; it is not assigned a zero performance score.
+The main report still requires at least three eligible goalies. Testing these
+calculations does not make aggregate GSAx a causal estimate of talent.
+
+
