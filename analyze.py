@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import hashlib
+from math import isfinite
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
@@ -9,15 +10,19 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parent
 
-def main():
-    source = ROOT / 'data/goalies_2024.csv'
-    raw = pd.read_csv(source)
+def calculate_metrics(raw):
+    """Validate source values and calculate rates before workload filtering."""
     columns = ['playerId', 'name', 'season', 'situation', 'icetime', 'xGoals', 'goals', 'ongoal']
     if not set(columns).issubset(raw.columns):
         raise ValueError('Missing required source columns')
     df = raw.loc[(raw.season == 2024) & (raw.situation == 'all'), columns].copy()
     if df.empty or df.playerId.duplicated().any() or df.isna().any().any():
         raise ValueError('Empty sample, duplicate goalies, or missing values')
+    numeric = ['icetime', 'xGoals', 'goals', 'ongoal']
+    if any(not pd.api.types.is_numeric_dtype(df[c]) or pd.api.types.is_bool_dtype(df[c]) for c in numeric):
+        raise ValueError('Metrics must be finite numeric values')
+    if not all(df[c].map(isfinite).all() for c in numeric):
+        raise ValueError('Metrics must be finite numeric values')
     if (df[['icetime', 'xGoals', 'goals', 'ongoal']] < 0).any().any() or (df.goals > df.ongoal).any():
         raise ValueError('Invalid time, count, or expected-goal value')
     df = df.loc[(df.icetime > 0) & (df.ongoal > 0)].copy()
@@ -27,6 +32,25 @@ def main():
     df['save_pct'] = 1 - df.goals / df.ongoal
     df['gaa'] = df.goals * 3600 / df.icetime
     df['xga_per60'] = df.xGoals * 3600 / df.icetime
+    return df
+
+
+def threshold_sensitivity(df, thresholds=(500, 1000, 1500, 2000)):
+    """Represent empty workload cohorts explicitly instead of calling idxmax."""
+    rows = []
+    for threshold in thresholds:
+        sample = df.loc[df.minutes >= threshold]
+        leader = sample.loc[sample.gsax_per60.idxmax()] if len(sample) else None
+        rows.append({'minimum_minutes': threshold, 'goalies': len(sample),
+                     'rate_leader': leader['name'] if leader is not None else None,
+                     'leader_gsax_per60': leader.gsax_per60 if leader is not None else None})
+    return pd.DataFrame(rows)
+
+
+def main():
+    source = ROOT / 'data/goalies_2024.csv'
+    raw = pd.read_csv(source)
+    df = calculate_metrics(raw)
     eligible = df.loc[df.minutes >= 1000].copy()
     if len(eligible) < 3:
         raise ValueError('Insufficient eligible goalies')
@@ -35,13 +59,7 @@ def main():
     out = ROOT / 'results'
     out.mkdir(exist_ok=True)
     eligible.sort_values('gsax', ascending=False).to_csv(out / 'goalie_metrics.csv', index=False)
-    sensitivity = []
-    for threshold in (500, 1000, 1500, 2000):
-        sample = df.loc[df.minutes >= threshold]
-        leader = sample.loc[sample.gsax_per60.idxmax()]
-        sensitivity.append({'minimum_minutes': threshold, 'goalies': len(sample),
-                            'rate_leader': leader['name'], 'leader_gsax_per60': leader.gsax_per60})
-    pd.DataFrame(sensitivity).to_csv(out / 'threshold_sensitivity.csv', index=False)
+    threshold_sensitivity(df).to_csv(out / 'threshold_sensitivity.csv', index=False)
     total = eligible.loc[eligible.gsax.idxmax()]
     rate = eligible.loc[eligible.gsax_per60.idxmax()]
     summary = {'season': '2024-25 regular season', 'situation': 'all',
@@ -71,3 +89,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
